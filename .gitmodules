@@ -1,0 +1,3 @@
+[submodule "contracts/zeppelin"]
+	path = contracts/zeppelin
+	url = git://github.com/OpenZeppelin/zeppelin-solidity.git
