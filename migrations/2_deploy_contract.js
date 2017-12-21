@@ -6,7 +6,7 @@ const AllocatedRefundableCappedCrowdsale = artifacts.require("./RefundableAlloca
 
 module.exports = function (deployer, network, accounts) {
 
-    Storage.setProdMode({
+    Storage.setDevMode({
         ownerAddress : "0xd794763E54EeCb87A7879147b5A17BfA6663a33C",
         destinationWalletAddress : "0x640F92b14FfEaA6b1fB13B7385929c38D41090E8",
 
@@ -16,12 +16,9 @@ module.exports = function (deployer, network, accounts) {
         teamAccountAddress : "0x06553D1befb814f44f2E6aa26e36a43819C2f18E"
     });
 
-    //Storage.setProdMode();
-
     const symbol = Storage.tokenSymbol;
     const name = Storage.tokenName;
     const decimals = Storage.tokenDecimals;
-    const oneTokenInCents = Storage.oneTokenInCents;
 
     // Даты начала и окончания продаж
     const firstStageDateStartTimestamp = Storage.firstStageDateStartTimestamp;
@@ -30,23 +27,13 @@ module.exports = function (deployer, network, accounts) {
     const secondStageDateStartTimestamp = Storage.secondStageDateStartTimestamp;
     const secondStageDateEndTimestamp = Storage.secondStageDateEndTimestamp;
 
-    const softCapGoalInCents = Storage.softCapGoalInCents;
-    const hardCapGoalInCents = Storage.hardCapGoalInCents;
-
     const advisorsAccountAddress = Storage.advisorsAccountAddress;
     const marketingAccountAddress = Storage.marketingAccountAddress;
     const supportAccountAddress = Storage.supportAccountAddress;
     const teamAccountAddress = Storage.teamAccountAddress;
 
-    const advisorsTokensAmount = Storage.advisorsTokensAmount;
-    const marketingTokensAmount = Storage.marketingTokensAmount;
-    const supportTokensAmount = Storage.supportTokensAmount;
-    const teamTokensAmount = Storage.teamTokensAmount;
     const teamTokensIssueDateTimestamp = Storage.teamTokensIssueDateTimestamp;
 
-    const firstStageTotalSupply = Storage.firstStageTotalSupply;
-    const secondStageTotalSupply = Storage.secondStageTotalSupply;
-    const secondStageReserve = Storage.secondStageReserve;
     const currentEtherRateInCents = Storage.etherRateInCents;
 
     const destinationWalletAddress = Storage.destinationWalletAddress;
@@ -55,6 +42,7 @@ module.exports = function (deployer, network, accounts) {
     // Деплой
     // Контракт токена
     return deployer.deploy(BurnableCrowdsaleToken, name, symbol, decimals).then(() => {
+
         // Контракт продаж
         return deployer.deploy(AllocatedRefundableCappedCrowdsale,
             currentEtherRateInCents,
