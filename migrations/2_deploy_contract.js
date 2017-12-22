@@ -7,14 +7,24 @@ const AllocatedRefundableCappedCrowdsale = artifacts.require("./RefundableAlloca
 module.exports = function (deployer, network, accounts) {
 
     Storage.setDevMode({
-        ownerAddress : "0xd794763E54EeCb87A7879147b5A17BfA6663a33C",
-        destinationWalletAddress : "0x640F92b14FfEaA6b1fB13B7385929c38D41090E8",
+        ownerAddress : accounts[0],
+        destinationWalletAddress : accounts[9],
 
-        advisorsAccountAddress : "0x528b0BE8b7dc9bDC61CDd1379Aa2c0769a10f2dd",
-        marketingAccountAddress : "0xa03430C31903447E2c6F2b84E60d183De62faAA6",
-        supportAccountAddress : "0xB3B778A62EAdF1D2C88c64E820D43EAF6ACf49f8",
-        teamAccountAddress : "0x06553D1befb814f44f2E6aa26e36a43819C2f18E"
+        advisorsAccountAddress : accounts[5],
+        marketingAccountAddress : accounts[6],
+        supportAccountAddress : accounts[7],
+        teamAccountAddress : accounts[8]
     });
+
+    // Storage.setProdMode({
+    //     ownerAddress : "0xd794763E54EeCb87A7879147b5A17BfA6663a33C",
+    //     destinationWalletAddress : "0x640F92b14FfEaA6b1fB13B7385929c38D41090E8",
+    //
+    //     advisorsAccountAddress : "0x528b0BE8b7dc9bDC61CDd1379Aa2c0769a10f2dd",
+    //     marketingAccountAddress : "0xa03430C31903447E2c6F2b84E60d183De62faAA6",
+    //     supportAccountAddress : "0xB3B778A62EAdF1D2C88c64E820D43EAF6ACf49f8",
+    //     teamAccountAddress : "0x06553D1befb814f44f2E6aa26e36a43819C2f18E"
+    // });
 
     const symbol = Storage.tokenSymbol;
     const name = Storage.tokenName;
