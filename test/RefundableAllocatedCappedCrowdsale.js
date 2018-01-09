@@ -5,6 +5,7 @@ const Converter = require("../lib/converter.js");
 const Storage = require("../lib/storage.js");
 
 const BurnableCrowdsaleToken = artifacts.require("./token/BurnableCrowdsaleToken.sol");
+const FundsVault = artifacts.require("./vault/FundsVault.sol");
 const AllocatedRefundableCappedCrowdsale = artifacts.require("./RefundableAllocatedCappedCrowdsale.sol");
 
 // enum State{PreFunding, FirstStageFunding, FirstStageEnd, SecondStageFunding, SecondStageEnd, Success, Failure, Refunding}
@@ -54,7 +55,7 @@ StringUtil.extend(String.prototype);
 
 // Сценарий остановки/возобнавления продаж, ничего не попокупали на первой стадии, затем на второй стадии сразу перевели 1050000000 центов, проверили бонус, достигли Hard Cap,
 // успешно завершили продажи
-let scenario = [scenarioTypes.haltToggle, scenarioTypes.onlyOneSecondStagePurchase, scenarioTypes.successFinished];
+//let scenario = [scenarioTypes.haltToggle, scenarioTypes.onlyOneSecondStagePurchase, scenarioTypes.successFinished];
 
 // Сценарий остановки/возобнавления продаж, немного попокупали на первой стадии, проверили выдачу бонусов, затем на второй стадии, проверили бонусы, достигли Hard Cap,
 // успешно завершили продажи
@@ -76,7 +77,7 @@ let scenario = [scenarioTypes.haltToggle, scenarioTypes.onlyOneSecondStagePurcha
 //let scenario = [scenarioTypes.haltToggle, scenarioTypes.firstStageSoftCapReached, scenarioTypes.secondStageSoftCapReached, scenarioTypes.successFinished];
 
 // Сценарий остановки/возобнавления продаж, затем достигли Soft Cap на первой стадии, с помощью функции догона статы, проверили бонусы, завершили вторую, успешно закончили продажи
-//let scenario = [scenarioTypes.haltToggle, scenarioTypes.firstStagePreallocate, scenarioTypes.firstStageSoftCapReached, scenarioTypes.secondStageSoftCapReached, scenarioTypes.successFinished];
+let scenario = [scenarioTypes.haltToggle, scenarioTypes.firstStagePreallocate, scenarioTypes.firstStageSoftCapReached, scenarioTypes.secondStageSoftCapReached, scenarioTypes.successFinished];
 
 function inScenario(description, value){
     return scenario.indexOf(value) != -1;
@@ -760,12 +761,17 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
     });
 
     it("Проверяем логику изменения destination wallet", async function() {
-        await callSetDestinationWalletAndExpectError(accounts[9], accounts[1]);
-        await callSetDestinationWalletAndExpectSuccess(accounts[9], ownerAccount);
+        await callSetDestinationWalletAndExpectError(accounts[8], accounts[1]);
+        await callSetDestinationWalletAndExpectSuccess(accounts[8], ownerAccount);
 
+        let fundsVaultDestinationWalletCall = await sale.fundsVault.call();
+        let fundsVaultInstance = FundsVault.at(fundsVaultDestinationWalletCall.toString());
+
+        let fundsVaultWalletCall = await fundsVaultInstance.wallet.call();
         let destinationWalletCall = await sale.destinationMultisigWallet.call();
 
-        assert.equal(destinationWalletCall.toString(), accounts[9], 'Ожидаемый адрес не совпадает с тем, который присвоен в контракте');
+        assert.equal(fundsVaultWalletCall.toString(), destinationWalletCall.toString(), 'Ожидаемый адрес не совпадает с тем, который присвоен в контракте FundsVault');
+        assert.equal(destinationWalletCall.toString(), accounts[8], 'Ожидаемый адрес не совпадает с тем, который присвоен в контракте');
 
         await callSetDestinationWalletAndExpectSuccess(Storage.destinationWalletAddress, ownerAccount);
     });
@@ -1233,7 +1239,7 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
     if (inScenario('Проверка успешного завершения', scenarioTypes.successFinished)){
 
         it("Проверяем логику изменения destination wallet, после успешного завершения нельзя менять адрес", async function() {
-            await callSetDestinationWalletAndExpectError(accounts[9], ownerAccount);
+            await callSetDestinationWalletAndExpectError(accounts[8], ownerAccount);
         });
 
         //Проверка распределения

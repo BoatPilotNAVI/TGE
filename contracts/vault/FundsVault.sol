@@ -58,6 +58,13 @@ contract FundsVault is Ownable, ValidationUtil {
     }
 
     /**
+     * Установливаем кошелек
+     */
+    function setWallet(address newWalletAddress) public onlyOwner inState(State.Active) {
+        wallet = newWalletAddress;
+    }
+
+    /**
      * Установить режим возврата денег
      */
     function enableRefunds() public onlyOwner inState(State.Active) {

@@ -428,6 +428,12 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
     }
 
     /**
+     * Функция, которая переопределяется в надледниках и выполняется после установки адреса аккаунта для перевода средств
+     */
+    function internalSetDestinationMultisigWallet(address destinationAddress) internal{
+    }
+
+    /**
      * Обновляем статистику для первой или второй стадии
      */
     function updateStat(State currentState, address receiver, uint tokenAmount, uint weiAmount) private{
@@ -458,6 +464,8 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
      */
     function setDestinationMultisigWallet(address destinationAddress) public onlyOwner canSetDestinationMultisigWallet{
         destinationMultisigWallet = destinationAddress;
+
+        internalSetDestinationMultisigWallet(destinationAddress);
     }
 
     /**

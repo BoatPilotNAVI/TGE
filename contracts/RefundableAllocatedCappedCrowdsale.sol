@@ -24,6 +24,15 @@ contract RefundableAllocatedCappedCrowdsale is AllocatedCappedCrowdsale {
         // При успешном завершении продаж, все собранные средства поступят на _destinationMultisigWallet
         // В противном случае могут быть переведены обратно инвесторам
         fundsVault = new FundsVault(_destinationMultisigWallet);
+
+    }
+
+    /** Устанавливаем новый кошелек для финального перевода
+    */
+    function internalSetDestinationMultisigWallet(address destinationAddress) internal{
+        fundsVault.setWallet(destinationAddress);
+
+        super.internalSetDestinationMultisigWallet(destinationAddress);
     }
 
     /** Финализация второго этапа
