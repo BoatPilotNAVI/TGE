@@ -1,14 +1,16 @@
 pragma solidity ^0.4.13;
 
-import "../math/SafeMathUtil.sol";
 import "../validation/ValidationUtil.sol";
 import '../zeppelin/contracts/token/StandardToken.sol';
 import "../zeppelin/contracts/ownership/Ownable.sol";
 
+import '../zeppelin/contracts/math/SafeMath.sol';
+
 /**
  * Шаблон для токена, который можно сжечь
 */
-contract BurnableToken is StandardToken, Ownable, ValidationUtil, SafeMathUtil {
+contract BurnableToken is StandardToken, Ownable, ValidationUtil {
+    using SafeMath for uint;
 
     address public tokenOwnerBurner;
 
@@ -16,10 +18,10 @@ contract BurnableToken is StandardToken, Ownable, ValidationUtil, SafeMathUtil {
     event Burned(address burner, uint burnedAmount);
 
     function setOwnerBurner(address _tokenOwnerBurner) public onlyOwner invalidOwnerBurner{
-        tokenOwnerBurner = _tokenOwnerBurner;
-
         // Проверка, что адрес не пустой
-        checkAddress(tokenOwnerBurner);
+        requireNotEmptyAddress(_tokenOwnerBurner);
+
+        tokenOwnerBurner = _tokenOwnerBurner;
     }
 
     /**
@@ -33,7 +35,7 @@ contract BurnableToken is StandardToken, Ownable, ValidationUtil, SafeMathUtil {
      * Сжигаем токены на балансе адреса токенов, вызвать может только tokenOwnerBurner
      */
     function burnTokens(address _address, uint burnAmount) public onlyTokenOwnerBurner validOwnerBurner{
-        balances[_address] = safeSub(balances[_address], burnAmount);
+        balances[_address] = balances[_address].sub(burnAmount);
 
         // Вызываем событие
         Burned(_address, burnAmount);
@@ -57,7 +59,7 @@ contract BurnableToken is StandardToken, Ownable, ValidationUtil, SafeMathUtil {
 
     modifier validOwnerBurner() {
         // Проверка, что адрес не пустой
-        checkAddress(tokenOwnerBurner);
+        requireNotEmptyAddress(tokenOwnerBurner);
 
         _;
     }

@@ -1,11 +1,10 @@
 pragma solidity ^0.4.13;
 
-
-import "./math/SafeMathUtil.sol";
-
 import "./validation/ValidationUtil.sol";
 import "./Haltable.sol";
 import "./token/BurnableCrowdsaleToken.sol";
+
+import './zeppelin/contracts/math/SafeMath.sol';
 
 /**
  * Базовый контракт для продаж
@@ -16,7 +15,9 @@ import "./token/BurnableCrowdsaleToken.sol";
 
 /* Продажи могут быть остановлены в любой момент по вызову halt() */
 
-contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
+contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
+    using SafeMath for uint;
+
     // Кол-во токенов для распределения
     uint public advisorsTokenAmount = 8040817;
     uint public supportTokenAmount = 3446064;
@@ -130,10 +131,10 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
      * - Failure: Не собрали Soft Cap
      * - Refunding: Возвращаем собранный эфир
      */
-    enum State{Unknown, PreFunding, FirstStageFunding, FirstStageEnd, SecondStageFunding, SecondStageEnd, Success, Failure, Refunding}
+    enum State{PreFunding, FirstStageFunding, FirstStageEnd, SecondStageFunding, SecondStageEnd, Success, Failure, Refunding}
 
     // Событие покупки токена
-    event Invested(address investor, uint weiAmount, uint tokenAmount);
+    event Invested(address indexed investor, uint weiAmount, uint tokenAmount);
 
     // Событие изменения курса eth
     event ExchangeRateChanged(uint oldExchangeRate, uint newExchangeRate);
@@ -154,14 +155,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
 
     // Конструктор
     function AllocatedCappedCrowdsale(uint _currentEtherRateInCents, address _token, address _destinationMultisigWallet, uint _firstStageStartsAt, uint _firstStageEndsAt, uint _secondStageStartsAt, uint _secondStageEndsAt, address _advisorsAccount, address _marketingAccount, address _supportAccount, address _teamAccount, uint _teamTokensIssueDate) {
-        owner = msg.sender;
-
-        // Токен, который поддерживает сжигание
-        token = BurnableCrowdsaleToken(_token);
-
-        destinationMultisigWallet = _destinationMultisigWallet;
-        checkAddress(destinationMultisigWallet);
-
+        requireNotEmptyAddress(_destinationMultisigWallet);
         // Проверка, что даты установлены
         require(_firstStageStartsAt != 0);
         require(_firstStageEndsAt != 0);
@@ -172,6 +166,12 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         require(_secondStageEndsAt != 0);
 
         require(_secondStageStartsAt < _secondStageEndsAt);
+        require(_teamTokensIssueDate != 0);
+
+        // Токен, который поддерживает сжигание
+        token = BurnableCrowdsaleToken(_token);
+
+        destinationMultisigWallet = _destinationMultisigWallet;
 
         firstStageStartsAt = _firstStageStartsAt;
         firstStageEndsAt = _firstStageEndsAt;
@@ -185,23 +185,22 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         teamAccount = _teamAccount;
 
         teamTokensIssueDate = _teamTokensIssueDate;
-        require(_teamTokensIssueDate != 0);
 
         currentEtherRateInCents = _currentEtherRateInCents;
 
-        secondStageTokensForSale = safeSub(secondStageTotalSupply, secondStageReserve);
+        secondStageTokensForSale = secondStageTotalSupply.sub(secondStageReserve);
     }
 
     /**
      * Функция, инициирующая нужное кол-во токенов для первого этапа продаж, вызвать можно только 1 раз
      */
     function mintTokensForFirstStage() public onlyOwner {
-        // Если уже создали токены для первой стадии, просто выходим
-        if(isFirstStageTokensMinted)return;
+        // Если уже создали токены для первой стадии, делаем откат
+        require(!isFirstStageTokensMinted);
 
         uint tokenMultiplier = 10 ** token.decimals();
 
-        token.mintToAddress(safeMul(firstStageTotalSupply, tokenMultiplier), address(this));
+        token.mintToAddress(firstStageTotalSupply.mul(tokenMultiplier), address(this));
 
         isFirstStageTokensMinted = true;
     }
@@ -210,14 +209,14 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
      * Функция, инициирующая нужное кол-во токенов для второго этапа продаж, только в случае, если это еще не сделано и были созданы токены для первой стадии
      */
     function mintTokensForSecondStage() private {
-        // Если уже создали токены для второй стадии, просто выходим
-        if (isSecondStageTokensMinted)return;
+        // Если уже создали токены для второй стадии, делаем откат
+        require(!isSecondStageTokensMinted);
 
         require(isFirstStageTokensMinted);
 
         uint tokenMultiplier = 10 ** token.decimals();
 
-        token.mintToAddress(safeMul(secondStageTotalSupply, tokenMultiplier), address(this));
+        token.mintToAddress(secondStageTotalSupply.mul(tokenMultiplier), address(this));
 
         isSecondStageTokensMinted = true;
     }
@@ -225,15 +224,15 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
     /**
      * Функция возвращающая текущую стоимость 1 токена в wei
      */
-    function getOneTokenInWei() public constant returns(uint){
-        return safeDiv(safeMul(oneTokenInCents, 10**18), currentEtherRateInCents);
+    function getOneTokenInWei() external constant returns(uint){
+        return oneTokenInCents.mul(10 ** 18).div(currentEtherRateInCents);
     }
 
     /**
      * Функция, которая переводит wei в центы по текущему курсу
      */
     function getWeiInCents(uint value) public constant returns(uint){
-        return safeDiv(safeMul(currentEtherRateInCents, value), 10 ** 18);
+        return currentEtherRateInCents.mul(value).div(10 ** 18);
     }
 
     /**
@@ -304,7 +303,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
             bonusStateMultiplier = 10;
 
             // Кол-во проданных токенов нужно считать от значения тех токенов, которые предназначены для продаж, т.е. secondStageTokensForSale
-            uint tokensSoldPercentage = safeDiv(safeMul(secondStageTokensSold, 100), safeMul(secondStageTokensForSale, tokenMultiplier));
+            uint tokensSoldPercentage = secondStageTokensSold.mul(100).div(secondStageTokensForSale.mul(tokenMultiplier));
 
             // меньше 7$ не принимаем
             require(amountInCents >= 700);
@@ -345,10 +344,10 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         } else revert();
 
         // сколько токенов нужно выдать без бонуса
-        uint resultValue = safeDiv(safeMul(amountInCents, tokenMultiplier), oneTokenInCents);
+        uint resultValue = amountInCents.mul(tokenMultiplier).div(oneTokenInCents);
 
         // с учетом бонуса
-        uint tokenAmount = safeDiv(safeMul(resultValue, safeMul(100, bonusStateMultiplier) + bonusPercentage), safeMul(100, bonusStateMultiplier));
+        uint tokenAmount = resultValue.mul(bonusStateMultiplier.mul(100).add(bonusPercentage)).div(bonusStateMultiplier.mul(100));
 
         // краевой случай, когда запросили больше, чем можем выдать
         uint tokensLeft = getTokensLeftForSale(currentState);
@@ -432,25 +431,33 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
      * Обновляем статистику для первой или второй стадии
      */
     function updateStat(State currentState, address receiver, uint tokenAmount, uint weiAmount) private{
-        weiRaised = safeAdd(weiRaised, weiAmount);
-        tokensSold = safeAdd(tokensSold, tokenAmount);
+        weiRaised = weiRaised.add(weiAmount);
+        tokensSold = tokensSold.add(tokenAmount);
 
         // Если это первая стадия
         if (currentState == State.FirstStageFunding){
             // Увеличиваем стату
-            firstStageRaisedInWei = safeAdd(firstStageRaisedInWei, weiAmount);
-            firstStageTokensSold = safeAdd(firstStageTokensSold, tokenAmount);
+            firstStageRaisedInWei = firstStageRaisedInWei.add(weiAmount);
+            firstStageTokensSold = firstStageTokensSold.add(tokenAmount);
         }
 
         // Если это вторая стадия
         if (currentState == State.SecondStageFunding){
             // Увеличиваем стату
-            secondStageRaisedInWei = safeAdd(secondStageRaisedInWei, weiAmount);
-            secondStageTokensSold = safeAdd(secondStageTokensSold, tokenAmount);
+            secondStageRaisedInWei = secondStageRaisedInWei.add(weiAmount);
+            secondStageTokensSold = secondStageTokensSold.add(tokenAmount);
         }
 
-        investedAmountOf[receiver] = safeAdd(investedAmountOf[receiver], weiAmount);
-        tokenAmountOf[receiver] = safeAdd(tokenAmountOf[receiver], tokenAmount);
+        investedAmountOf[receiver] = investedAmountOf[receiver].add(weiAmount);
+        tokenAmountOf[receiver] = tokenAmountOf[receiver].add(tokenAmount);
+    }
+
+    /**
+     * Функция, которая позволяет менять адрес аккаунта, куда будут переведены средства, в случае успеха,
+     * менять может только владелец и только в случае если продажи еще не завершены успехом
+     */
+    function setDestinationMultisigWallet(address destinationAddress) public onlyOwner canSetDestinationMultisigWallet{
+        destinationMultisigWallet = destinationAddress;
     }
 
     /**
@@ -484,7 +491,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
     function issueTeamTokens() public onlyOwner inState(State.Success) {
         require(block.timestamp >= teamTokensIssueDate);
 
-        uint teamTokenTransferAmount = safeMul(teamTokenAmount, 10 ** token.decimals());
+        uint teamTokenTransferAmount = teamTokenAmount.mul(10 ** token.decimals());
 
         if (!token.transfer(teamAccount, teamTokenTransferAmount)) revert();
     }
@@ -512,7 +519,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
     /**
      * Покупка токенов через внешние системы
      */
-    function externalBuy(address buyerAddress, uint weiAmount) public onlyOwner {
+    function externalBuy(address buyerAddress, uint weiAmount) external onlyOwner {
         internalInvest(buyerAddress, weiAmount, true);
     }
 
@@ -534,7 +541,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         require(saleContractTokenCount <= tokenContractTokenCount);
 
         investedAmountOf[msg.sender] = 0;
-        weiRefunded = safeAdd(weiRefunded, weiValue);
+        weiRefunded = weiRefunded.add(weiValue);
 
         // Событие генерируется в наследниках
         internalRefund(msg.sender, weiValue);
@@ -579,7 +586,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         if (isSoftCapGoalReached()){
             uint tokenMultiplier = 10 ** token.decimals();
 
-            uint remainingTokens = safeSub(safeMul(secondStageTokensForSale, tokenMultiplier), secondStageTokensSold);
+            uint remainingTokens = secondStageTokensForSale.mul(tokenMultiplier).sub(secondStageTokensSold);
 
             // Если кол-во оставшихся токенов > 0, то сжигаем их
             if (remainingTokens > 0){
@@ -587,9 +594,9 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
             }
 
             // Переводим на подготовленные аккаунты: advisorsWalletAddress, marketingWalletAddress, teamWalletAddress
-            uint advisorsTokenTransferAmount = safeMul(advisorsTokenAmount, tokenMultiplier);
-            uint marketingTokenTransferAmount = safeMul(marketingTokenAmount, tokenMultiplier);
-            uint supportTokenTransferAmount = safeMul(supportTokenAmount, tokenMultiplier);
+            uint advisorsTokenTransferAmount = advisorsTokenAmount.mul(tokenMultiplier);
+            uint marketingTokenTransferAmount = marketingTokenAmount.mul(tokenMultiplier);
+            uint supportTokenTransferAmount = supportTokenAmount.mul(tokenMultiplier);
 
             // Токены для команды заблокированы до даты teamTokensIssueDate и могут быть востребованы, только при вызове спец. функции
             // issueTeamTokens
@@ -686,13 +693,13 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         // Кол-во токенов, которое адрес контракта можеть снять у owner'а и есть кол-во оставшихся токенов, из этой суммы нужно вычесть кол-во которое не участвует в продаже
         uint tokenBalance = token.balanceOf(address(this));
         uint tokensReserve = 0;
-        if (forState == State.SecondStageFunding) tokensReserve = safeMul(secondStageReserve, 10 ** token.decimals());
+        if (forState == State.SecondStageFunding) tokensReserve = secondStageReserve.mul(10 ** token.decimals());
 
         if (tokenBalance <= tokensReserve){
             return 0;
         }
 
-        return safeSub(tokenBalance, tokensReserve);
+        return tokenBalance.sub(tokensReserve);
     }
 
     /**
@@ -732,8 +739,8 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
             // Первая стадия финализирована, вторая - финализирована
             if (isSecondStageFinalized){
 
-                // Набрали Hard Cap или Soft Cap при условии финализации второй сдадии - это успешное закрытие продаж
-                if (isHardCapGoalReached() || isSoftCapGoalReached())return State.Success;
+                // Если набрали Soft Cap при условии финализации второй сдадии - это успешное закрытие продаж
+                if (isSoftCapGoalReached())return State.Success;
                 // Собрать Soft Cap не удалось, текущее состояние - провал
                 else return State.Failure;
 
@@ -777,7 +784,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
     /** Только, если текущее состояние - продажи первой стадии или первая стадия закончилась */
     modifier isFirstStageFundingOrEnd() {
         State curState = getState();
-        require(curState == State.FirstStageFunding|| curState == State.FirstStageEnd);
+        require(curState == State.FirstStageFunding || curState == State.FirstStageEnd);
 
         _;
     }
@@ -789,15 +796,24 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil, SafeMathUtil {
         _;
     }
 
+    /** Только, если идет вторая стадия или вторая стадия завершилась */
     modifier isSecondStageFundingOrEnd() {
         State curState = getState();
-        require(curState == State.SecondStageFunding|| curState == State.SecondStageEnd);
+        require(curState == State.SecondStageFunding || curState == State.SecondStageEnd);
 
         _;
     }
 
+    /** Только, если еще не включен режим возврата и продажи не завершены успехом */
     modifier canEnableRefunds(){
         require(!isRefundingEnabled && getState() != State.Success);
+
+        _;
+    }
+
+    /** Только, если продажи не завершены успехом */
+    modifier canSetDestinationMultisigWallet(){
+        require(getState() != State.Success);
 
         _;
     }

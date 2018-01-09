@@ -19,8 +19,6 @@ contract CrowdsaleToken is StandardToken, Ownable {
 
     uint public decimals;
 
-    bool public canMint;
-
     address public mintAgent;
 
     /** Событие обновления токена (имя и символ) */
@@ -45,14 +43,12 @@ contract CrowdsaleToken is StandardToken, Ownable {
         symbol = _symbol;
 
         decimals = _decimals;
-
-        canMint = true;
     }
 
     /**
      * Владелец должен вызвать эту функцию, чтобы выпустить токены на адрес
      */
-    function mintToAddress(uint amount, address toAddress) onlyWhenCanMint{
+    function mintToAddress(uint amount, address toAddress) onlyMintAgent{
         // перевод токенов на аккаунт
         balances[toAddress] = amount;
 
@@ -78,17 +74,8 @@ contract CrowdsaleToken is StandardToken, Ownable {
         mintAgent =  _address;
     }
 
-    /**
-    * Модификаторы
-    */
-    modifier onlyWhenCanMint(){
-        require(canMint);
-
-        _;
-    }
-
-    modifier onlyOwnerOrMintAgent(){
-        require(msg.sender == owner || msg.sender == mintAgent);
+    modifier onlyMintAgent(){
+        require(msg.sender == mintAgent);
 
         _;
     }

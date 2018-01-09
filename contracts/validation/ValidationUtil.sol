@@ -5,7 +5,7 @@ pragma solidity ^0.4.13;
  */
 
 contract ValidationUtil {
-    function checkAddress(address value) internal{
+    function requireNotEmptyAddress(address value) internal{
         require(isAddressValid(value));
     }
 

@@ -7,17 +7,16 @@ const Storage = require("../lib/storage.js");
 const BurnableCrowdsaleToken = artifacts.require("./token/BurnableCrowdsaleToken.sol");
 const AllocatedRefundableCappedCrowdsale = artifacts.require("./RefundableAllocatedCappedCrowdsale.sol");
 
-// enum State{Unknown, PreFunding, FirstStageFunding, FirstStageEnd, SecondStageFunding, SecondStageEnd, Success, Failure, Refunding}
+// enum State{PreFunding, FirstStageFunding, FirstStageEnd, SecondStageFunding, SecondStageEnd, Success, Failure, Refunding}
 const saleStates = {
-    unknown : 0,
-    preFunding: 1,
-    firstStageFunding : 2,
-    firstStageEnd : 3,
-    secondStageFunding : 4,
-    secondStageEnd : 5,
-    success : 6,
-    failure : 7,
-    refunding : 8
+    preFunding: 0,
+    firstStageFunding : 1,
+    firstStageEnd : 2,
+    secondStageFunding : 3,
+    secondStageEnd : 4,
+    success : 5,
+    failure : 6,
+    refunding : 7
 };
 
 const scenarioTypes = {
@@ -39,7 +38,6 @@ const scenarioTypes = {
 
 // Преобразование состояния в строку
 let salesStateStr = {};
-salesStateStr[saleStates.unknown] = 'Unknown';
 salesStateStr[saleStates.preFunding] = 'PreFunding';
 salesStateStr[saleStates.firstStageFunding] = 'FirstStageFunding';
 salesStateStr[saleStates.firstStageEnd] = 'FirstStageEnd';
@@ -56,7 +54,7 @@ StringUtil.extend(String.prototype);
 
 // Сценарий остановки/возобнавления продаж, ничего не попокупали на первой стадии, затем на второй стадии сразу перевели 1050000000 центов, проверили бонус, достигли Hard Cap,
 // успешно завершили продажи
-//let scenario = [scenarioTypes.haltToggle, scenarioTypes.onlyOneSecondStagePurchase, scenarioTypes.successFinished];
+let scenario = [scenarioTypes.haltToggle, scenarioTypes.onlyOneSecondStagePurchase, scenarioTypes.successFinished];
 
 // Сценарий остановки/возобнавления продаж, немного попокупали на первой стадии, проверили выдачу бонусов, затем на второй стадии, проверили бонусы, достигли Hard Cap,
 // успешно завершили продажи
@@ -78,7 +76,7 @@ StringUtil.extend(String.prototype);
 //let scenario = [scenarioTypes.haltToggle, scenarioTypes.firstStageSoftCapReached, scenarioTypes.secondStageSoftCapReached, scenarioTypes.successFinished];
 
 // Сценарий остановки/возобнавления продаж, затем достигли Soft Cap на первой стадии, с помощью функции догона статы, проверили бонусы, завершили вторую, успешно закончили продажи
-let scenario = [scenarioTypes.haltToggle, scenarioTypes.firstStagePreallocate, scenarioTypes.firstStageSoftCapReached, scenarioTypes.secondStageSoftCapReached, scenarioTypes.successFinished];
+//let scenario = [scenarioTypes.haltToggle, scenarioTypes.firstStagePreallocate, scenarioTypes.firstStageSoftCapReached, scenarioTypes.secondStageSoftCapReached, scenarioTypes.successFinished];
 
 function inScenario(description, value){
     return scenario.indexOf(value) != -1;
@@ -116,9 +114,9 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
     function getNotOwnerAccountAddress(){
         let result = null;
 
-        for(let account in accounts){
-            if (account != Storage.ownerAddress){
-                return account;
+        for(let accountIndex in accounts){
+            if (accounts[accountIndex] != Storage.ownerAddress){
+                return accounts[accountIndex];
             };
         };
 
@@ -270,6 +268,31 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
     function callUnhaltAndExpectSuccess(fromAccount){
         return callUnhalt(fromAccount).then((err, success) => {
             assert.equal(err, null, 'Вызов unhalt() допускается только владельцем');
+        });
+    };
+
+    function callSetDestinationWallet(newAccount, fromAccount){
+        return new Promise(async (resolve, reject) => {
+
+            try{
+                await sale.setDestinationMultisigWallet(newAccount, {from: fromAccount});
+
+                resolve(null, true);
+            }catch(ex){
+                resolve(ex, null);
+            };
+        });
+    };
+
+    function callSetDestinationWalletAndExpectError(newAccount, fromAccount){
+        return callSetDestinationWallet(newAccount, fromAccount).then((err, success) => {
+            assert.notEqual(err, null, 'Вызов setDestinationMultisigWallet() должен возвращать ошибку');
+        });
+    };
+
+    function callSetDestinationWalletAndExpectSuccess(newAccount, fromAccount){
+        return callSetDestinationWallet(newAccount, fromAccount).then((err, success) => {
+            assert.equal(err, null, 'Вызов setDestinationMultisigWallet() не должен возвращать ошибку');
         });
     };
 
@@ -736,6 +759,17 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
         await checkSaleState(saleStates.firstStageFunding);
     });
 
+    it("Проверяем логику изменения destination wallet", async function() {
+        await callSetDestinationWalletAndExpectError(accounts[9], accounts[1]);
+        await callSetDestinationWalletAndExpectSuccess(accounts[9], ownerAccount);
+
+        let destinationWalletCall = await sale.destinationMultisigWallet.call();
+
+        assert.equal(destinationWalletCall.toString(), accounts[9], 'Ожидаемый адрес не совпадает с тем, который присвоен в контракте');
+
+        await callSetDestinationWalletAndExpectSuccess(Storage.destinationWalletAddress, ownerAccount);
+    });
+
     it('На балансе контракта AllocatedRefundableCappedCrowdsale на первой стадии, всего должно находится {0} токенов'.format(Storage.firstStageTotalSupply), async function(){
         let totalTokensCall = await token.balanceOf.call(sale.address);
 
@@ -757,7 +791,7 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
     });
 
 
-    if (!inScenario('Одна большая покупка на второй стадии', scenarioTypes.onlyOneSecondStagePurchase)){
+    if (!inScenario('Если сценарий не onlyOneSecondStagePurchase', scenarioTypes.onlyOneSecondStagePurchase)){
 
 
         if (inScenario('Проверка preallocateFirstStage, продали 535714.285714285714285714, по цене 2500000 центов', scenarioTypes.firstStagePreallocate)){
@@ -975,13 +1009,20 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
 
                 it('Проверка догона до Soft Cap, с помощью функции preallocateSecondStage', async function(){
                     await callPreallocateSecondStageAndExpectSuccess(ownerAccount, accounts[4], Converter.getTokenValue(1000, Storage.tokenDecimals), centsToWei(392369238));
-
-                    let isWeiRaisedCall = await sale.weiRaised.call();
-
                 });
 
                 it('Финализатор второй стадии должен сработать успешно', async function(){
+                    let fundsVaultCall = await sale.fundsVault.call();
+
+                    let balanceBeforeCall = await getBalance(fundsVaultCall.valueOf());
+
                     await callFinalizeSecondStageAndExpectSuccess(ownerAccount);
+
+                    let destinationBalance = await getBalance(Storage.destinationWalletAddress);
+
+                    let result = checkFloatValuesEquality(balanceBeforeCall.valueOf(), destinationBalance.valueOf(), 0.5);
+
+                    assert.isTrue(result, 'Переведенное значение на адрес destination wallet должно соответствовать значению, которое было на контракте продаж');
                 });
 
                 it('Состояние, после выполнения финализатора первой стадии, переменная isSecondStageFinalized должа быть = true', async function(){
@@ -1047,7 +1088,17 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
             });
 
             it('Финализатор второй стадии должен сработать успешно', async function(){
+                let fundsVaultCall = await sale.fundsVault.call();
+
+                let balanceBeforeCall = await getBalance(fundsVaultCall.valueOf());
+
                 await callFinalizeSecondStageAndExpectSuccess(ownerAccount);
+
+                let destinationBalance = await getBalance(Storage.destinationWalletAddress);
+
+                let result = checkFloatValuesEquality(balanceBeforeCall.valueOf(), destinationBalance.valueOf(), 0.5);
+
+                assert.isTrue(result, 'Переведенное значение на адрес destination wallet должно соответствовать значению, которое было на контракте продаж');
             });
 
             it('Состояние, после выполнения финализатора второй стадии, при достижении Soft Cap должно быть Success, переменная isSecondStageFinalized должа быть = true, также isSuccessOver = true', async function(){
@@ -1129,7 +1180,17 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
             //Финализатор второй стадии
 
             it('Финализатор второй стадии должен сработать успешно', async function(){
+                let fundsVaultCall = await sale.fundsVault.call();
+
+                let balanceBeforeCall = await getBalance(fundsVaultCall.valueOf());
+
                 await callFinalizeSecondStageAndExpectSuccess(ownerAccount);
+
+                let destinationBalance = await getBalance(Storage.destinationWalletAddress);
+
+                let result = checkFloatValuesEquality(balanceBeforeCall.valueOf(), destinationBalance.valueOf(), 0.5);
+
+                assert.isTrue(result, 'Переведенное значение на адрес destination wallet должно соответствовать значению, которое было на контракте продаж');
             });
 
             it('Состояние, после выполнения финализатора второй стадии, в случае успеха должно быть Success, переменная isSecondStageFinalized должа быть = true, также isSuccessOver = true', async function(){
@@ -1170,6 +1231,10 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
 
 
     if (inScenario('Проверка успешного завершения', scenarioTypes.successFinished)){
+
+        it("Проверяем логику изменения destination wallet, после успешного завершения нельзя менять адрес", async function() {
+            await callSetDestinationWalletAndExpectError(accounts[9], ownerAccount);
+        });
 
         //Проверка распределения
         it("На аккаунте советников должно быть 8040817 токенов", async function() {

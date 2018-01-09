@@ -1,14 +1,18 @@
 pragma solidity ^0.4.13;
 
 import "../zeppelin/contracts/ownership/Ownable.sol";
-import "../math/SafeMathUtil.sol";
 import "../validation/ValidationUtil.sol";
 
+import '../zeppelin/contracts/math/SafeMath.sol';
+import '../zeppelin/contracts/math/Math.sol';
 /**
  * Шаблон класса хранилища средств, которое используется в контракте продаж
  * Поддерживает возврат средств, а такте перевод средств на кошелек, в случае успешного проведения продаж
  */
-contract FundsVault is Ownable, SafeMathUtil, ValidationUtil {
+contract FundsVault is Ownable, ValidationUtil {
+    using SafeMath for uint;
+    using Math for uint;
+
     enum State {Active, Refunding, Closed}
 
     mapping (address => uint256) public deposited;
@@ -28,7 +32,7 @@ contract FundsVault is Ownable, SafeMathUtil, ValidationUtil {
      * Поддерживает возврат средств, а такте перевод средств на кошелек, в случае успешного проведения продаж
      */
     function FundsVault(address _wallet) {
-        checkAddress(_wallet);
+        requireNotEmptyAddress(_wallet);
 
         wallet = _wallet;
 
@@ -39,7 +43,7 @@ contract FundsVault is Ownable, SafeMathUtil, ValidationUtil {
      * Положить депозит в хранилище
      */
     function deposit(address investor) public payable onlyOwner inState(State.Active) {
-        deposited[investor] = safeAdd(deposited[investor], msg.value);
+        deposited[investor] = deposited[investor].add(msg.value);
     }
 
     /**
@@ -66,7 +70,7 @@ contract FundsVault is Ownable, SafeMathUtil, ValidationUtil {
      * Функция возврата средств
      */
     function refund(address investor, uint weiAmount) public onlyOwner inState(State.Refunding){
-        uint256 depositedValue = min256(weiAmount, deposited[investor]);
+        uint256 depositedValue = weiAmount.min256(deposited[investor]);
         deposited[investor] = 0;
         investor.transfer(depositedValue);
 
