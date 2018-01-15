@@ -16,12 +16,15 @@ module.exports = function (deployer, network, accounts) {
         return burnableCrowdsaleTokenInstance.setMintAgent(AllocatedRefundableCappedCrowdsale.address, {from: ownerAddress});
     }).then((result) => {
         return burnableCrowdsaleTokenInstance.setOwnerBurner(AllocatedRefundableCappedCrowdsale.address, {from : ownerAddress});
+    }).then((result) => {
+
+        // Начинаем первую стадию
+        AllocatedRefundableCappedCrowdsale.deployed().then((instance) => {
+            return instance.mintTokensForFirstStage({from : ownerAddress});
+        });
+
     });
 
-    // Начинаем первую стадию
-    AllocatedRefundableCappedCrowdsale.deployed().then((instance) => {
-        return instance.mintTokensForFirstStage({from : ownerAddress});
-    });
 
 
 };

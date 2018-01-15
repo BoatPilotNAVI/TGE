@@ -6,24 +6,27 @@ const AllocatedRefundableCappedCrowdsale = artifacts.require("./RefundableAlloca
 
 module.exports = function (deployer, network, accounts) {
 
-    Storage.setDevMode({
-       ownerAddress : accounts[0],
-       destinationWalletAddress : accounts[9],
-
-       advisorsAccountAddress : accounts[5],
-       marketingAccountAddress : accounts[6],
-       supportAccountAddress : accounts[7],
-       teamAccountAddress : accounts[8]
-    });
-
-    // Storage.setProdMode({
-    //     ownerAddress : "0xd794763E54EeCb87A7879147b5A17BfA6663a33C",
-    //     destinationWalletAddress : "0x640F92b14FfEaA6b1fB13B7385929c38D41090E8",
-    //     advisorsAccountAddress : "0x528b0BE8b7dc9bDC61CDd1379Aa2c0769a10f2dd",
-    //     marketingAccountAddress : "0xa03430C31903447E2c6F2b84E60d183De62faAA6",
-    //     supportAccountAddress : "0xB3B778A62EAdF1D2C88c64E820D43EAF6ACf49f8",
-    //     teamAccountAddress : "0x06553D1befb814f44f2E6aa26e36a43819C2f18E"
+    // Storage.setDevMode({
+    //    ownerAddress : accounts[0],
+    //    destinationWalletAddress : accounts[9],
+    //
+    //    advisorsAccountAddress : accounts[5],
+    //    marketingAccountAddress : accounts[6],
+    //    supportAccountAddress : accounts[7],
+    //    teamAccountAddress : accounts[8]
     // });
+
+    Storage.setProdMode({
+        ownerAddress : "0x00fdCd75E8E070052eF194eC2025b376A2001644",
+
+        //!!!Поменять!!!
+        destinationWalletAddress : "0x908d9c592c5204c999e59bf3468e35b034863413",
+
+        advisorsAccountAddress : "0x318907BD8463D9a22e297B065C4Bd405c180e8e0",
+        marketingAccountAddress : "0xE6A8068C33b3B747EeD514Bd79f8B9235EB179Ef",
+        supportAccountAddress : "0xfDBbFB26B73fb17D3988CaeF0642c3B51f80ABce",
+        teamAccountAddress : "0xE0d4CEb6b23e3DfbAfd972C15725e22b74e664AF"
+    });
 
     const symbol = Storage.tokenSymbol;
     const name = Storage.tokenName;

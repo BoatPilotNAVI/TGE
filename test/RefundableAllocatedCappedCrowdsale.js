@@ -150,7 +150,9 @@ contract('AllocatedRefundableCappedCrowdsale', async function(accounts) {
     function sendExternalEther(fromAccount, contractInstance, toAccount, wei){
         return new Promise(async (resolve, reject) => {
             try{
-                let result = await contractInstance.externalBuy(toAccount, wei, {from: fromAccount});
+                //тестый id транзакции
+                let testTxId = 1001;
+                let result = await contractInstance.externalBuy(toAccount, wei, testTxId, {from: fromAccount});
 
                 resolve(null, result);
 

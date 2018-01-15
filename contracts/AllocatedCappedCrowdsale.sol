@@ -134,7 +134,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
     enum State{PreFunding, FirstStageFunding, FirstStageEnd, SecondStageFunding, SecondStageEnd, Success, Failure, Refunding}
 
     // Событие покупки токена
-    event Invested(address indexed investor, uint weiAmount, uint tokenAmount);
+    event Invested(address indexed investor, uint weiAmount, uint tokenAmount, uint centAmount, uint txId);
 
     // Событие изменения курса eth
     event ExchangeRateChanged(uint oldExchangeRate, uint newExchangeRate);
@@ -253,12 +253,12 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
     /**
      * Низкоуровневая функция перевода эфира и выдачи токенов
      */
-    function internalAssignTokens(address receiver, uint tokenAmount, uint weiAmount) internal {
+    function internalAssignTokens(address receiver, uint tokenAmount, uint weiAmount, uint centAmount, uint txId) internal {
         // Переводим токены инвестору
         assignTokens(receiver, tokenAmount);
 
         // Вызываем событие
-        Invested(receiver, weiAmount, tokenAmount);
+        Invested(receiver, weiAmount, tokenAmount, centAmount, txId);
 
         // Может переопределяеться в наследниках
     }
@@ -267,8 +267,9 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
      * Инвестиции
      * Должен быть включен режим продаж первой или второй стадии и не собран Hard Cap
      * @param receiver - эфирный адрес получателя
+     * @param txId - id внешней транзакции
      */
-    function internalInvest(address receiver, uint weiAmount, bool isExternalCall) stopInEmergency inFirstOrSecondFundingState notHardCapReached internal {
+    function internalInvest(address receiver, uint weiAmount, uint txId) stopInEmergency inFirstOrSecondFundingState notHardCapReached internal {
         State currentState = getState();
 
         uint tokenMultiplier = 10 ** token.decimals();
@@ -364,7 +365,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
         }
 
         // Кидаем токены инвестору
-        internalAssignTokens(receiver, tokenAmount, weiAmount);
+        internalAssignTokens(receiver, tokenAmount, weiAmount, amountInCents, txId);
 
         // Обновляем статистику
         updateStat(currentState, receiver, tokenAmount, weiAmount);
@@ -372,7 +373,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
         // Шлем на кошелёк эфир
         // Функция - прослойка для возможности переопределения в дочерних классах
         // Если это внешний вызов, то депозит не кладем
-        if (!isExternalCall){
+        if (txId == 0){
             internalDeposit(destinationMultisigWallet, weiAmount);
         }
 
@@ -412,7 +413,7 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
         require(getTokensLeftForSale(currentState) >= tokenAmount);
 
         // Может быть 0, выдаем токены бесплатно
-        internalAssignTokens(receiver, tokenAmount, weiAmount);
+        internalAssignTokens(receiver, tokenAmount, weiAmount, getWeiInCents(weiAmount), 0);
 
         // Обновляем статистику
         updateStat(currentState, receiver, tokenAmount, weiAmount);
@@ -521,14 +522,14 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
      * Покупка токенов, кидаем токены на адрес отправителя
      */
     function buy() public payable {
-        internalInvest(msg.sender, msg.value, false);
+        internalInvest(msg.sender, msg.value, 0);
     }
 
     /**
      * Покупка токенов через внешние системы
      */
-    function externalBuy(address buyerAddress, uint weiAmount) external onlyOwner {
-        internalInvest(buyerAddress, weiAmount, true);
+    function externalBuy(address buyerAddress, uint weiAmount, uint txId) external onlyOwner {
+        internalInvest(buyerAddress, weiAmount, txId);
     }
 
     /**
