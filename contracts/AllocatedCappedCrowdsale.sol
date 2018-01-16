@@ -529,6 +529,8 @@ contract AllocatedCappedCrowdsale is Haltable, ValidationUtil {
      * Покупка токенов через внешние системы
      */
     function externalBuy(address buyerAddress, uint weiAmount, uint txId) external onlyOwner {
+        require(txId != 0);
+
         internalInvest(buyerAddress, weiAmount, txId);
     }
 
